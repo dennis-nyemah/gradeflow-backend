@@ -1,206 +1,224 @@
 package com.gradeflow.service;
 
 import com.gradeflow.dto.Dto;
-import com.gradeflow.entity.*;
+import com.gradeflow.entity.Grade;
+import com.gradeflow.entity.Student;
+import com.gradeflow.entity.User;
+import com.gradeflow.entity.GradeTemplate;
 import com.gradeflow.repository.GradeRepository;
+import com.gradeflow.repository.SponsorTeacherRepository;
 import com.gradeflow.repository.StudentRepository;
-import com.gradeflow.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * Grade Service
+ *
+ * Core business logic service for handling:
+ * - Grade submission (create/update)
+ * - Teacher grade retrieval
+ * - Sponsor grade sheet compilation
+ * - Student-grade analytics and reporting
+ *
+ * This is the central grading engine of the GradeFlow system.
+ */
 @Service
 @RequiredArgsConstructor
 public class GradeService {
 
     private final GradeRepository gradeRepository;
     private final StudentRepository studentRepository;
-    private final UserRepository userRepository;
+    private final SponsorTeacherRepository sponsorTeacherRepository;
     private final TemplateService templateService;
-    private final StudentService studentService;
 
-    // ── Teacher: submit or update a grade ──────────────────────────────────────
+    // ─────────────────────────────────────────────
+    // Submit or update grade (UPSERT operation)
+    // ─────────────────────────────────────────────
 
+    /**
+     * Submits a grade or updates an existing one.
+     *
+     * Logic:
+     * - Find student
+     * - Check if grade already exists (student + teacher + subject + period)
+     * - If exists → update
+     * - If not → create new
+     * - Compute total score dynamically
+     */
+    @Transactional
     public Dto.GradeResponse submitGrade(Dto.GradeRequest request, User teacher) {
         Student student = studentRepository.findById(request.getStudentId())
                 .orElseThrow(() -> new RuntimeException("Student not found"));
 
-        Grade grade = gradeRepository.findByStudentAndTeacher(student, teacher)
-                .orElse(Grade.builder().student(student).teacher(teacher).subject(teacher.getSubject()).build());
+        String subject = request.getSubject();
+        String period  = request.getPeriod();
 
-        grade.setFirstTest(request.getFirstTest());
-        grade.setSecondTest(request.getSecondTest());
-        grade.setMidTerm(request.getMidTerm());
-        grade.setHomework(request.getHomework());
-        grade.setExam(request.getExam());
-        grade.setRemarks(request.getRemarks());
-        grade.setTotal(computeTotal(request));
+        // Upsert logic (update or create)
+        Grade grade = gradeRepository
+                .findByStudentAndTeacherAndSubjectAndPeriod(student, teacher, subject, period)
+                .orElseGet(() -> Grade.builder()
+                        .student(student)
+                        .teacher(teacher)
+                        .subject(subject)
+                        .period(period)
+                        .build());
 
-        return toGradeResponse(gradeRepository.save(grade));
+        // Set dynamic scores
+        Map<String, Double> scores = parseScores(request.getScores());
+        grade.setScores(scores);
+
+        // Compute total
+        grade.setTotal(computeTotal(scores));
+
+        return toResponse(gradeRepository.save(grade));
     }
 
-    public List<Dto.GradeResponse> getMyGrades(User teacher) {
+    // ─────────────────────────────────────────────
+    // Teacher: fetch all submitted grades
+    // ─────────────────────────────────────────────
+
+    /**
+     * Returns all grades submitted by a teacher.
+     */
+    public List<Dto.GradeResponse> getGradesByTeacher(User teacher) {
         return gradeRepository.findByTeacher(teacher)
-                .stream().map(this::toGradeResponse).collect(Collectors.toList());
+                .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
-    // ── Sponsor: grade sheet status list ───────────────────────────────────────
+    // ─────────────────────────────────────────────
+    // Teacher: students under assigned sponsors
+    // ─────────────────────────────────────────────
 
-    public List<Dto.GradeSheetStatusResponse> getAllGradeSheetStatus(User sponsor) {
-        GradeTemplate template = templateService.getLatestActiveTemplate();
-        List<Student> students = studentRepository.findBySponsorOrderByFullNameAsc(sponsor);
-
-        if (template == null || students.isEmpty()) {
-            return students.stream().map(s -> Dto.GradeSheetStatusResponse.builder()
-                    .studentId(s.getId())
-                    .fullName(s.getFullName())
-                    .className(s.getClassName())
-                    .term(s.getTerm())
-                    .submittedSubjects(0)
-                    .totalSubjects(0)
-                    .isComplete(false)
-                    .build()).collect(Collectors.toList());
-        }
-
-        List<String> allSubjects = parseList(template.getSubjects());
-        int total = allSubjects.size();
-
-        // Load all grades for these students in one query
-        Map<Long, List<Grade>> gradesByStudent = gradeRepository.findByStudentIn(students)
-                .stream().collect(Collectors.groupingBy(g -> g.getStudent().getId()));
-
-        return students.stream().map(s -> {
-            List<Grade> grades = gradesByStudent.getOrDefault(s.getId(), List.of());
-            Set<String> submittedSubjects = grades.stream()
-                    .map(g -> g.getSubject().trim().toLowerCase())
-                    .collect(Collectors.toSet());
-            int submitted = (int) allSubjects.stream()
-                    .filter(sub -> submittedSubjects.contains(sub.trim().toLowerCase()))
-                    .count();
-            return Dto.GradeSheetStatusResponse.builder()
-                    .studentId(s.getId())
-                    .fullName(s.getFullName())
-                    .className(s.getClassName())
-                    .term(s.getTerm())
-                    .submittedSubjects(submitted)
-                    .totalSubjects(total)
-                    .isComplete(submitted == total && total > 0)
-                    .build();
-        }).collect(Collectors.toList());
+    /**
+     * Returns students from all sponsors this teacher is assigned to.
+     */
+    public List<Dto.StudentResponse> getStudentsForTeacher(User teacher) {
+        List<User> sponsors = sponsorTeacherRepository.findByTeacher(teacher)
+                .stream()
+                .map(st -> st.getSponsor())
+                .collect(Collectors.toList());
+        return studentRepository.findBySponsorInOrderByFullNameAsc(sponsors)
+                .stream()
+                .map(s -> Dto.StudentResponse.builder()
+                        .id(s.getId())
+                        .fullName(s.getFullName())
+                        .studentId(s.getStudentId())
+                        .className(s.getClassName())
+                        .academicYear(s.getAcademicYear())
+                        .build())
+                .collect(Collectors.toList());
     }
 
-    // ── Sponsor: compiled grade sheet for one student ──────────────────────────
+    // ─────────────────────────────────────────────
+    // Sponsor: full grade sheet for a student
+    // ─────────────────────────────────────────────
 
+    /**
+     * Builds a complete grade sheet for a student.
+     *
+     * Includes:
+     * - Student info
+     * - All grades
+     * - Active grading template (for UI rendering)
+     */
     public Dto.CompiledGradeSheetResponse getCompiledGradeSheet(Long studentId, User sponsor) {
         Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new RuntimeException("Student not found"));
 
+        // Security check: ensure sponsor owns student
         if (!student.getSponsor().getId().equals(sponsor.getId())) {
             throw new RuntimeException("Access denied");
         }
 
-        GradeTemplate template = templateService.getLatestActiveTemplate();
-        if (template == null) throw new RuntimeException("No active template found");
-
-        List<String> allSubjects = parseList(template.getSubjects());
         List<Grade> grades = gradeRepository.findByStudent(student);
 
-        // Map subject name (lowercase) → grade
-        Map<String, Grade> gradeMap = grades.stream()
-                .collect(Collectors.toMap(g -> g.getSubject().trim().toLowerCase(), g -> g, (a, b) -> a));
+        List<Dto.GradeResponse> gradeResponses = grades.stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
 
-        List<Dto.SubjectGrade> subjectGrades = new ArrayList<>();
-        List<String> pending = new ArrayList<>();
-        List<Double> totals = new ArrayList<>();
-
-        for (String subject : allSubjects) {
-            Grade g = gradeMap.get(subject.trim().toLowerCase());
-            if (g != null) {
-                subjectGrades.add(Dto.SubjectGrade.builder()
-                        .subject(subject)
-                        .firstTest(g.getFirstTest())
-                        .secondTest(g.getSecondTest())
-                        .midTerm(g.getMidTerm())
-                        .homework(g.getHomework())
-                        .exam(g.getExam())
-                        .total(g.getTotal())
-                        .remarks(g.getRemarks())
-                        .build());
-                if (g.getTotal() != null) totals.add(g.getTotal());
-            } else {
-                pending.add(subject);
-                subjectGrades.add(Dto.SubjectGrade.builder().subject(subject).build());
-            }
+        // Load active template for rendering grade sheet
+        GradeTemplate activeTemplate = templateService.getLatestActiveTemplateForUser(student.getSponsor());
+        if (activeTemplate == null) {
+            activeTemplate = templateService.getLatestActiveTemplate();
         }
 
-        Double overallAverage = totals.isEmpty() ? null
-                : Math.round(totals.stream().mapToDouble(Double::doubleValue).average().orElse(0) * 10.0) / 10.0;
-
-        boolean isComplete = pending.isEmpty();
-
         return Dto.CompiledGradeSheetResponse.builder()
-                .student(studentService.toResponse(student))
-                .template(templateService.toResponse(template))
-                .grades(subjectGrades)
-                .overallAverage(overallAverage)
-                .overallRemark(deriveRemark(overallAverage))
-                .pendingSubjects(pending)
-                .isComplete(isComplete)
+                .studentId(student.getId())
+                .studentName(student.getFullName())
+                .className(student.getClassName())
+                .academicYear(student.getAcademicYear())
+                .template(activeTemplate != null ? templateService.toResponse(activeTemplate) : null)
+                .grades(gradeResponses)
                 .build();
     }
 
-    // ── Teacher: list students available to grade ──────────────────────────────
+    // ─────────────────────────────────────────────
+    // Sponsor: grade completion status
+    // ─────────────────────────────────────────────
 
-    public List<Dto.StudentResponse> getStudentsForTeacher() {
-        GradeTemplate template = templateService.getLatestActiveTemplate();
-        if (template == null) return List.of();
-        return studentRepository.findByAcademicYearAndTermOrderByFullNameAsc(
-                        template.getAcademicYear(), template.getTerm())
-                .stream().map(studentService::toResponse).collect(Collectors.toList());
+    /**
+     * Returns summary of grading progress per student.
+     */
+    public List<Dto.GradeSheetStatusResponse> getAllGradeSheetStatus(User sponsor) {
+        List<Student> students = studentRepository.findBySponsorOrderByFullNameAsc(sponsor);
+
+        // Batch-fetch all grades for this sponsor's students in one query
+        List<Grade> allGrades = gradeRepository.findByStudentIn(students);
+        Map<Long, List<Grade>> gradesByStudent = allGrades.stream()
+                .collect(Collectors.groupingBy(g -> g.getStudent().getId()));
+
+        return students.stream().map(s -> {
+            List<Grade> grades = gradesByStudent.getOrDefault(s.getId(), List.of());
+            List<String> submittedSubjects = grades.stream()
+                    .map(Grade::getSubject)
+                    .distinct()
+                    .collect(Collectors.toList());
+            return Dto.GradeSheetStatusResponse.builder()
+                    .studentId(s.getId())
+                    .studentName(s.getFullName())
+                    .className(s.getClassName())
+                    .submittedSubjects(submittedSubjects)
+                    .totalGrades(grades.size())
+                    .build();
+        }).collect(Collectors.toList());
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────
+    // Helpers
+    // ─────────────────────────────────────────────
 
-    private Double computeTotal(Dto.GradeRequest r) {
-        double sum = 0;
-        if (r.getFirstTest()  != null) sum += r.getFirstTest();
-        if (r.getSecondTest() != null) sum += r.getSecondTest();
-        if (r.getMidTerm()    != null) sum += r.getMidTerm();
-        if (r.getHomework()   != null) sum += r.getHomework();
-        if (r.getExam()       != null) sum += r.getExam();
-        return Math.round(sum * 10.0) / 10.0;
+    private Map<String, Double> parseScores(Map<String, Object> raw) {
+        if (raw == null) return Map.of();
+        return raw.entrySet().stream()
+                .filter(e -> e.getValue() != null && !e.getValue().toString().isBlank())
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        e -> Double.parseDouble(e.getValue().toString())
+                ));
     }
 
-    private String deriveRemark(Double avg) {
-        if (avg == null) return "—";
-        if (avg >= 80) return "Excellent";
-        if (avg >= 70) return "Very Good";
-        if (avg >= 60) return "Good";
-        if (avg >= 50) return "Pass";
-        return "Fail";
+    private Double computeTotal(Map<String, Double> scores) {
+        if (scores == null || scores.isEmpty()) return null;
+        return scores.values().stream().mapToDouble(Double::doubleValue).sum();
     }
 
-    private List<String> parseList(String csv) {
-        return Arrays.stream(csv.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .collect(Collectors.toList());
-    }
-
-    private Dto.GradeResponse toGradeResponse(Grade g) {
+    private Dto.GradeResponse toResponse(Grade g) {
         return Dto.GradeResponse.builder()
                 .id(g.getId())
-                .student(studentService.toResponse(g.getStudent()))
+                .studentId(g.getStudent().getId())
+                .studentName(g.getStudent().getFullName())
                 .subject(g.getSubject())
-                .firstTest(g.getFirstTest())
-                .secondTest(g.getSecondTest())
-                .midTerm(g.getMidTerm())
-                .homework(g.getHomework())
-                .exam(g.getExam())
+                .period(g.getPeriod())
+                .scores(g.getScores() != null
+                        ? g.getScores().entrySet().stream()
+                        .collect(Collectors.toMap(Map.Entry::getKey, e -> (Object) e.getValue()))
+                        : Map.of())
                 .total(g.getTotal())
-                .remarks(g.getRemarks())
                 .build();
     }
 }

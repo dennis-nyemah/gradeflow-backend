@@ -6,6 +6,21 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * User Entity
+ *
+ * Represents all system users in GradeFlow.
+ *
+ * This is the central identity model for authentication and authorization.
+ *
+ * Supported roles:
+ * - IT: System administrator (manages sponsors, teachers, templates)
+ * - SPONSOR: Class/grade manager (handles students and grade sheets)
+ * - TEACHER: Subject teacher (submits grades)
+ *
+ * This single-user model simplifies authentication and supports
+ * role-based access control (RBAC).
+ */
 @Entity
 @Table(name = "users")
 @Data
@@ -14,75 +29,56 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class User {
 
+    /**
+     * Primary identifier for the user.
+     */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /**
+     * Full name of the user.
+     */
     @Column(nullable = false)
     private String fullName;
 
+    /**
+     * Unique username used for login authentication.
+     */
     @Column(nullable = false, unique = true)
     private String username;
 
+    /**
+     * Encrypted password (stored using BCrypt).
+     */
     @Column(nullable = false)
     private String password;
 
+    /**
+     * Role to determine what actions the user can perform in the system.
+     */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role;
 
-    public String getUsername() {
-        return username;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getFullName() {
-        return fullName;
-    }
-
-    public void setFullName(String fullName) {
-        this.fullName = fullName;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
-    public Role getRole() {
-        return role;
-    }
-
-    public void setRole(Role role) {
-        this.role = role;
-    }
-
-    public String getSubject() {
-        return subject;
-    }
-
-    public void setSubject(String subject) {
-        this.subject = subject;
-    }
-
-    // Only populated for TEACHER accounts
+    /**
+     * Subject taught by TEACHER users only.
+     *
+     * Example: Mathematics, English, Science
+     */
     private String subject;
 
+    /**
+     * Grade level managed by SPONSOR users only.
+     *
+     * Example: "Grade 2", "Grade 10A"
+     */
+    private String gradeLevel;
+
+    /**
+     * System roles supported in GradeFlow.
+     */
     public enum Role {
-        SPONSOR, TEACHER
+        IT, SPONSOR, TEACHER
     }
 }

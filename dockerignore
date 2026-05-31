@@ -1,0 +1,24 @@
+# Git
+.git
+
+# IntelliJ
+.idea
+*.iml
+
+# Build output
+target
+build
+
+# Local secrets
+.env
+src/main/resources/application.properties
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Frontend dependencies (if monorepo)
+node_modules

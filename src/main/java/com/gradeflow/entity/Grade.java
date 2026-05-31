@@ -1,47 +1,106 @@
 package com.gradeflow.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Map;
+
+/**
+ * Grade Entity
+ *
+ * Represents a student's grade record submitted by a teacher.
+ *
+ * Each Grade:
+ * - Belongs to one Student
+ * - Is created by one Teacher
+ * - Represents a specific subject and period
+ * - Stores dynamic scoring columns (based on grading template)
+ *
+ * This entity supports flexible grading systems where different schools
+ * can define their own grading structure (e.g., quizzes, exams, assignments).
+ */
 @Entity
-@Table(
-        name = "grades",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"student_id", "teacher_id"})
-)
+@Table(name = "grades")
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class Grade {
 
+    /**
+     * Primary identifier for the grade record.
+     */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /**
+     * The student this grade belongs to.
+     *
+     * Many grades can belong to one student.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "student_id", nullable = false)
     private Student student;
 
+    /**
+     * The teacher who submitted this grade.
+     *
+     * Many grades can be submitted by one teacher.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "teacher_id", nullable = false)
     private User teacher;
 
-    // The subject this grade belongs to (copied from teacher.subject at submission time)
+    /**
+     * Subject for which this grade was recorded.
+     * Example: Mathematics, English, Science
+     */
     @Column(nullable = false)
     private String subject;
 
-    // Grading columns — all nullable since a teacher may only use a subset
-    private Double firstTest;
-    private Double secondTest;
-    private Double midTerm;
-    private Double homework;
-    private Double exam;
+    /**
+     * Academic period for the grade.
+     * Example: "1st Period", "2nd Period", "Exam"
+     */
+    @NotBlank()
+    private String period;
 
-    // Computed and stored at submission time
+    /**
+     * Dynamic scoring system stored as key-value pairs.
+     *
+     * Example:
+     * {
+     *   "Class Participation": 18.0,
+     *   "Quiz": 20.0,
+     *   "Exam": 60.0
+     * }
+     *
+     * Stored in a separate table (grade_scores) using JPA ElementCollection.
+     */
+    @ElementCollection
+    @CollectionTable(
+            name = "grade_scores",
+            joinColumns = @JoinColumn(name = "grade_id")
+    )
+    @MapKeyColumn(name = "col_name")
+    @Column(name = "score")
+    private Map<String, Double> scores;
+
+    /**
+     * Final computed total score.
+     *
+     * This is calculated at submission time and stored for performance
+     * (avoids recalculation during queries).
+     */
     private Double total;
 
+    /**
+     * Optional teacher remarks about student performance.
+     */
     private String remarks;
 }

@@ -6,6 +6,23 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * GradeTemplate Entity
+ *
+ * Represents the grading structure configuration used by a sponsor/class.
+ *
+ * A GradeTemplate defines:
+ * - School information (name, address, motto)
+ * - Academic context (class, academic year)
+ * - Subject structure
+ * - Grading column structure (e.g., 1st, 2nd, Final Exam)
+ * - Grading scale rules
+ *
+ * Only one template can be active at a time per sponsor context (business rule).
+ *
+ * This entity allows GradeFlow to support customizable grading systems
+ * across different schools and academic setups.
+ */
 @Entity
 @Table(name = "grade_templates")
 @Data
@@ -14,137 +31,79 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class GradeTemplate {
 
+    /**
+     * Primary identifier for the template.
+     */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // School info
+    /**
+     * Name of the school using this template.
+     */
     @Column(nullable = false)
     private String schoolName;
 
+    /**
+     * Physical address of the school.
+     */
     private String schoolAddress;
+
+    /**
+     * School motto or slogan.
+     */
     private String schoolMotto;
 
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getSchoolName() {
-        return schoolName;
-    }
-
-    public void setSchoolName(String schoolName) {
-        this.schoolName = schoolName;
-    }
-
-    public String getSchoolAddress() {
-        return schoolAddress;
-    }
-
-    public void setSchoolAddress(String schoolAddress) {
-        this.schoolAddress = schoolAddress;
-    }
-
-    public String getSchoolMotto() {
-        return schoolMotto;
-    }
-
-    public void setSchoolMotto(String schoolMotto) {
-        this.schoolMotto = schoolMotto;
-    }
-
-    public String getAcademicYear() {
-        return academicYear;
-    }
-
-    public void setAcademicYear(String academicYear) {
-        this.academicYear = academicYear;
-    }
-
-    public String getTerm() {
-        return term;
-    }
-
-    public void setTerm(String term) {
-        this.term = term;
-    }
-
-    public String getClassName() {
-        return className;
-    }
-
-    public void setClassName(String className) {
-        this.className = className;
-    }
-
-    public String getSubjects() {
-        return subjects;
-    }
-
-    public void setSubjects(String subjects) {
-        this.subjects = subjects;
-    }
-
-    public String getGradingColumns() {
-        return gradingColumns;
-    }
-
-    public void setGradingColumns(String gradingColumns) {
-        this.gradingColumns = gradingColumns;
-    }
-
-    public String getGradingScale() {
-        return gradingScale;
-    }
-
-    public void setGradingScale(String gradingScale) {
-        this.gradingScale = gradingScale;
-    }
-
-    public boolean isActive() {
-        return active;
-    }
-
-    public void setActive(boolean active) {
-        this.active = active;
-    }
-
-    public User getCreatedBy() {
-        return createdBy;
-    }
-
-    public void setCreatedBy(User createdBy) {
-        this.createdBy = createdBy;
-    }
-
-    // Term info
-    @Column(nullable = false)
-    private String academicYear;
-
-    @Column(nullable = false)
-    private String term;
-
-    @Column(nullable = false)
+    /**
+     * Class or grade level this template applies to.
+     * Example: "Grade 10A"
+     */
     private String className;
 
-    // Comma-separated lists
-    @Column(nullable = false, columnDefinition = "TEXT")
+    /**
+     * Academic year for this grading template.
+     * Example: "2025-2026"
+     */
+    private String academicYear;
+
+    /**
+     * List of subjects included in this template.
+     *
+     * Stored as a raw string.
+     */
+    @Column(columnDefinition = "TEXT")
     private String subjects;
 
-    @Column(nullable = false)
+    /**
+     * Definition of grading columns.
+     *
+     * Example:
+     * "Classwork, Quiz, HomeWork, Exam"
+     */
     private String gradingColumns;
 
+    /**
+     * Grading scale rules.
+     *
+     * Example:
+     * A=90-100 (Excellent), B=80-89 (Very Good), C=70-79 (Good), F=0-69 (Fail)
+     */
     private String gradingScale;
 
-    @Column(nullable = false)
-    @Builder.Default
-    private boolean active = true;
+    /**
+     * Indicates whether this template is currently active.
+     *
+     * Business rule:
+     * Only one template should be active per context.
+     */
+    private boolean active;
 
+    /**
+     * The IT/Admin user who created this template.
+     *
+     * Many templates can be created by one admin.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by")
+    @JoinColumn(name = "created_by", nullable = false)
     private User createdBy;
 }

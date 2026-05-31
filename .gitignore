@@ -1,8 +1,11 @@
 HELP.md
 target/
-.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
+.gitattributes
+
+# Application secrets
+src/main/resources/application.properties
 
 ### STS ###
 .apt_generated
