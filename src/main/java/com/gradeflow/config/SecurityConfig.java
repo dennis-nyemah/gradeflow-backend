@@ -60,7 +60,7 @@ public class SecurityConfig {
             "http://localhost:5173",
             "http://localhost:3000",
             "https://von-unperched-affectionally.ngrok-free.dev",
-            "https://gradeflow-frontend.vercel.app"
+            "https://gradeflow-gamma.vercel.app"
     );
 
     /**
