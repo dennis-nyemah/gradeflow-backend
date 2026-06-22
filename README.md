@@ -24,17 +24,17 @@ This takes hours of work, which results in delays in delivery of students report
 
 ### IT Admin Dashboard
 
-![IT Admin Dashboard](assets/snapshots/admin-dashboard.png)
+![IT Admin Dashboard](assets/screenshots/admin-dashboard.png)
 
 ### Sponsor Dashboard
 
-![Sponsor Dashboard](assets/snapshots/sponsor-dashboard.png)
-![Sponsor Dashboard](assets/snapshots/sponsor-dashboard2.png)
-![Sponsor Dashboard](assets/snapshots/sponsor-dashboard3.png)
+![Sponsor Dashboard](assets/screenshots/sponsor-dashboard.png)
+![Sponsor Dashboard](assets/screenshots/sponsor-dashboard2.png)
+![Sponsor Dashboard](assets/screenshots/sponsor-dashboard3.png)
 
 ### Teacher Grade Entry
 
-![Teacher Grade Entry](assets/snapshots/teacher-grade-entry.png)
+![Teacher Grade Entry](assets/screenshots/teacher-grade-entry.png)
 
 ---
 ## Companion Repository
