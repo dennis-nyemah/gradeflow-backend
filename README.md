@@ -16,7 +16,33 @@ This takes hours of work, which results in delays in delivery of students report
 
 * Teachers log in, select a student, subject, grade/class, period, enter scores across the dynamic grading columns the IT/School admin configured, and submit grades. They can update a submission if they made a mistake.
 
+## 📸 Snapshots
 
+### Login
+
+![Login](assets/screenshots/login.png)
+
+### IT Admin Dashboard
+
+![IT Admin Dashboard](assets/snapshots/admin-dashboard.png)
+
+### Sponsor Dashboard
+
+![Sponsor Dashboard](assets/snapshots/sponsor-dashboard.png)
+![Sponsor Dashboard](assets/snapshots/sponsor-dashboard2.png)
+![Sponsor Dashboard](assets/snapshots/sponsor-dashboard3.png)
+
+### Teacher Grade Entry
+
+![Teacher Grade Entry](assets/snapshots/teacher-grade-entry.png)
+
+---
+## Companion Repository
+
+This project contains the Spring Boot REST API for GradeFlow.
+
+Frontend (React):
+https://github.com/dennis-nyemah/gradeflow-frontend
 ---
 ## Running locally
 
@@ -29,7 +55,7 @@ This takes hours of work, which results in delays in delivery of students report
 ```bash
 npm install
 npm run dev
-```
+``
 
 **Environment variables (backend)**
 ```env
@@ -47,4 +73,8 @@ ADMIN_PASSWORD=
 
 ## Author
 
-Dennis P. Nyemah — backend and aspiring AI engineer.
+Dennis P. Nyemah
+
+Backend Developer | Java • Spring Boot • PostgreSQL
+
+Passionate about building software that solves real-world problems and exploring AI-powered systems.
